@@ -59,34 +59,24 @@ function dictionaryEntryExists(id) {
 function processForeignIdProperty(property, entity, checkFunction) {
   const unExistant = [];
   let action = Promise.resolve();
-  if (property.type === 'select') {
-    const value = entity.metadata[property.name];
-    action = checkFunction(value).then(exists => {
-      if (!exists) {
-        if (verbose) {
-          console.log(
-            `Entity ${entity.title} (${entity.sharedId}) in ${property.name} has an unexistant value: ${value}`
-          );
-        }
-        unExistant.push(entity.metadata[property.name]);
-      }
-    });
-  } else {
-    action = Promise.all(
-      entity.metadata[property.name].map(sharedId =>
-        checkFunction(sharedId).then(exists => {
-          if (!exists) {
-            if (verbose) {
-              console.log(
-                `Entity ${entity.title} (${entity.sharedId}) in ${property.name} has an unexistant value: ${sharedId}`
-              );
-            }
-            unExistant.push(sharedId);
-          }
-        })
-      )
-    );
+  if (!entity.metadata[property.name].length) {
+    return action;
   }
+
+  action = Promise.all(
+    entity.metadata[property.name].map(({ value }) =>
+      checkFunction(value).then(exists => {
+        if (!exists) {
+          if (verbose) {
+            console.log(
+              `Entity ${entity.title} (${entity.sharedId}) in ${property.name} has an unexistant value: ${value}`
+            );
+          }
+          unExistant.push(value);
+        }
+      })
+    )
+  );
 
   return action.then(() => {
     if (unExistant.length) {
@@ -176,6 +166,9 @@ db.once('open', () => {
     .then(getDicionaries)
     .then(processEntities)
     .then(() => {
+      // console.log(entitiesNeedToBeFixed.map(({ title, language, _id }) => {
+      //   return { title, language, _id };
+      // }));
       process.stdout.write(`Entities processed: ${entitiesProcessed} of ${totalEntities}\n`);
       process.stdout.write(`Entities with errors: ${entitiesNeedToBeFixed.length}\n`);
       process.stdout.write(`Entities fixed: ${fixed}\n`);
